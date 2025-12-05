@@ -1,0 +1,48 @@
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Gradle
+.gradle/
+build/
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+
+# Eclipse
+.settings/
+.classpath
+.project
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Application Properties
+**/application*.properties
+**/application*.yml
+!**/src/main/resources/application*.properties
+!**/src/main/resources/application*.yml
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# VS Code
+.vscode/
+
+# Compiled files
+*.class
