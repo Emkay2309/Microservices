@@ -1,0 +1,176 @@
+version: "3.8"
+
+services:
+
+  # ===============================
+  # MySQL Databases
+  # ===============================
+
+  mysql-product:
+    image: mysql:8.0
+    container_name: mysql-product
+    restart: always
+    environment:
+      MYSQL_DATABASE: productdb
+      MYSQL_USER: product
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_product_data:/var/lib/mysql
+
+  mysql-order:
+    image: mysql:8.0
+    container_name: mysql-order
+    restart: always
+    environment:
+      MYSQL_DATABASE: orderdb
+      MYSQL_USER: order
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_order_data:/var/lib/mysql
+
+  mysql-inventory:
+    image: mysql:8.0
+    container_name: mysql-inventory
+    restart: always
+    environment:
+      MYSQL_DATABASE: inventorydb
+      MYSQL_USER: inventory
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql_inventory_data:/var/lib/mysql
+
+
+  # ===============================
+  # Infrastructure
+  # ===============================
+
+  discovery-server:
+    image: microservices-tutorial/discovery-server:latest
+    container_name: discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+  api-gateway:
+    image: microservices-tutorial/api-gateway:latest
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - discovery-server
+
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+
+  # ===============================
+  # Microservices
+  # ===============================
+
+  product-service:
+    image: microservices-tutorial/product-service:latest
+    container_name: product-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-product:3306/productdb
+      SPRING_DATASOURCE_USERNAME: product
+      SPRING_DATASOURCE_PASSWORD: password
+    depends_on:
+      - mysql-product
+      - discovery-server
+
+  order-service:
+    image: microservices-tutorial/order-service:latest
+    container_name: order-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-order:3306/orderdb
+      SPRING_DATASOURCE_USERNAME: order
+      SPRING_DATASOURCE_PASSWORD: password
+    depends_on:
+      - mysql-order
+      - kafka
+      - discovery-server
+
+  inventory-service:
+    image: microservices-tutorial/inventory-service:latest
+    container_name: inventory-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-inventory:3306/inventorydb
+      SPRING_DATASOURCE_USERNAME: inventory
+      SPRING_DATASOURCE_PASSWORD: password
+    depends_on:
+      - mysql-inventory
+      - discovery-server
+
+
+  # ===============================
+  # Observability
+  # ===============================
+
+  prometheus:
+    image: prom/prometheus:v2.51.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana-oss:10.2.3
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: password
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+
+# ===============================
+# Volumes
+# ===============================
+
+volumes:
+  mysql_product_data:
+  mysql_order_data:
+  mysql_inventory_data:
+  grafana_data:
