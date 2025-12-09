@@ -1,5 +1,6 @@
 package com.order_service.service;
 
+import com.order_service.dto.InventoryResponse;
 import com.order_service.dto.OrderLineItemsDto;
 import com.order_service.dto.OrderRequest;
 import com.order_service.dto.OrderResponse;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,7 +24,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
-    private final WebClient webClient;
+    private final WebClient.Builder webClientBuilder;
 
     public OrderResponse placeOrder(OrderRequest orderRequest) {
         Order order = new Order();
@@ -37,16 +39,30 @@ public class OrderService {
         orderLineItems.forEach(item -> item.setOrder(order));
         order.setOrderLineItemsList(orderLineItems);
 
-        //call Inventory service and place order if product is in stock
-        Boolean result = webClient.get()
-                .uri("http://localhost:9094/api/inventory")
+        List<String> skuCodes = orderLineItems
+                .stream()
+                .map(OrderLineItems::getSkuCode)
+                .toList();
+
+        InventoryResponse[] inventoryResponses = webClientBuilder.build().get()
+                .uri(uriBuilder -> uriBuilder
+                        .scheme("http")
+                        .host("localhost")
+                        .port(9094)
+                        .path("/api/inventory")
+                        .queryParam("skuCode", skuCodes) // <-- IMPORTANT
+                        .build()
+                )
                 .retrieve()
-                .bodyToMono(Boolean.class)
+                .bodyToMono(InventoryResponse[].class)
                 .block();
 
         Order savedOrder = null;
 
-        if (Boolean.TRUE.equals(result)) {
+        boolean allProudctsInStocks = Arrays.stream(inventoryResponses)
+                .allMatch(InventoryResponse::isInInStock);
+
+        if (Boolean.TRUE.equals(allProudctsInStocks)) {
             savedOrder = orderRepository.save(order);
         }
         else {
